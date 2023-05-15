@@ -97,6 +97,19 @@ def session_page(session: Session, database: Database) -> str:
     return render_page(title=f"{session.data.session_name}", content=content)
 
 
+def index_page(title: str, links: list[str]) -> str:
+    items = "\n".join(links)
+    content = dedent(
+        """
+        <h1>{title}</h1>
+        <ul>
+        {items}
+        </ul>
+        """
+    )
+    return render_page(title, content)
+
+
 def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> None:
     shutil.rmtree(output_dir)
     (output_dir).mkdir(exist_ok=True)
@@ -107,11 +120,17 @@ def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> No
     )
 
     (output_dir / "sessions").mkdir()
+    links = []
     for session in database.sessions.values():
         page = session_page(session, database)
         path = Path(session.url).relative_to("/").write_text(page)
+        links.append(session.link)
+    (output_dir / "sessions.html").write_text(index_page("Sessions", links))
 
     (output_dir / "speakers").mkdir()
+    links = []
     for speaker in database.speakers.values():
         page = speaker_page(speaker, database)
         path = Path(speaker.url).relative_to("/").write_text(page)
+        links.append(speaker.link)
+    (output_dir / "speakers.html").write_text(index_page("Speakers", links))
