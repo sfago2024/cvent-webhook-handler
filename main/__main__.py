@@ -8,7 +8,7 @@ from typing import Annotated, cast
 
 import uvicorn
 from fastapi import Body, FastAPI, Header, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -20,10 +20,6 @@ from .pages import generate_pages
 
 def make_app(*, auth_token: str, data_dir: Path, static_dir: Path, output_dir: Path):
     app = FastAPI()
-
-    @app.get("/")
-    async def root():
-        return {"message": "It is working (probably)"}
 
     @app.get("/cvent-event")
     async def auth(
@@ -71,22 +67,7 @@ def make_app(*, auth_token: str, data_dir: Path, static_dir: Path, output_dir: P
             logger.error("Failed to generate pages", exc_info=True)
             return
 
-    @app.get("/default.css")
-    async def css():
-        return FileResponse(output_dir / "default.css")
-
-    @app.get("/schedule")
-    async def schedule():
-        return FileResponse(output_dir / "schedule" / "index.html")
-
-    @app.get("/sessions/{name}")
-    async def sessions(name: str):
-        return FileResponse(output_dir / "sessions" / name / "index.html")
-
-    @app.get("/speakers/{name}")
-    async def speakers(name: str):
-        return FileResponse(output_dir / "speakers" / name / "index.html")
-
+    app.mount("/", StaticFiles(directory=output_dir), name="gen")
     return app
 
 
