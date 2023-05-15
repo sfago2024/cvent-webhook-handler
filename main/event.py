@@ -119,15 +119,15 @@ class Database:
         (data_dir / "sessions").mkdir(exist_ok=True)
         for session in self.sessions.values():
             if session.updated:
-                (data_dir / "sessions" / session.filename).write_text(
-                    session.data.json()
-                )
+                path = data_dir / "sessions" / session.filename
+                path.write_text(session.data.json())
+                logger.info("Wrote %s", path)
         (data_dir / "speakers").mkdir(exist_ok=True)
         for speaker in self.speakers.values():
             if speaker.updated:
-                (data_dir / "speakers" / speaker.filename).write_text(
-                    speaker.data.json()
-                )
+                path = data_dir / "speakers" / speaker.filename
+                path.write_text(speaker.data.json())
+                logger.info("Wrote %s", path)
 
     def delete_session(self, stub: str) -> bool:
         if (existing := self.sessions.get(stub)) is not None:
@@ -168,8 +168,13 @@ class Database:
 
 def handle_event(event: dict, output_dir: Path, database: Database) -> bool:
     event_type = event["eventType"]
-    message = event["message"]
+    message, *others = event["message"]
+    if others:
+        logger.warning("Request contained additional messages")
+        for line in json.dumps(others, indent=4).splitlines():
+            logger.debug("others: %s", line)
 
+    logger.info("Handling event of type %r", event_type)
     if event_type == "SessionCreated":
         session = SessionData(**message)
         changed = database.update_session(session)

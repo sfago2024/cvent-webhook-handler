@@ -1,9 +1,12 @@
+import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 
 from .event import Database, Session, Speaker
+
+logger = logging.getLogger(__name__)
 
 
 def render_page(title: str, content: str):
@@ -123,7 +126,8 @@ def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> No
     links = []
     for session in database.sessions.values():
         page = session_page(session, database)
-        path = Path(session.url).relative_to("/").write_text(page)
+        path = Path(session.url).relative_to("/")
+        (output_dir / path).write_text(page)
         links.append(session.link)
     (output_dir / "sessions.html").write_text(index_page("Sessions", links))
 
@@ -131,6 +135,7 @@ def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> No
     links = []
     for speaker in database.speakers.values():
         page = speaker_page(speaker, database)
-        path = Path(speaker.url).relative_to("/").write_text(page)
+        path = Path(speaker.url).relative_to("/")
+        (output_dir / path).write_text(page)
         links.append(speaker.link)
     (output_dir / "speakers.html").write_text(index_page("Speakers", links))
