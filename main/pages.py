@@ -22,7 +22,7 @@ def render_page(title: str, content: str):
           <div class="main-flex">
             <header>
               <div>
-                <img src="https://www.sfago2024.org/img/logo.png" alt="AGO 2024 San Francisco logo">
+                <img src="/img/logo.png" alt="AGO 2024 San Francisco logo">
                 <div class="line"></div>
                 <p class="dates"><time datetime="2024-06-30">June 30</time> – <time datetime="2024-07-04">July 4, 2024</time></p>
               </div>
