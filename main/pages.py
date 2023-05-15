@@ -64,9 +64,9 @@ def speaker_page(speaker: Speaker, database: Database) -> str:
     content = dedent(
         """\
         <h1>{speaker.data.speaker_display_name}</h1>
-        <h2>Biography<\h2>
+        <h2>Biography</h2>
         <p>{speaker.data.speaker_biography}</p>
-        <h2>Sessions<\h2>
+        <h2>Sessions</h2>
         {sessions}
         """
     ).format(**locals())
@@ -91,9 +91,9 @@ def session_page(session: Session, database: Database) -> str:
         {session.data.session_start_date_time:%I:%M %p} – {session.data.session_end_date_time:%I:%M %p} ({session.data.timezone_name})</p>
         <h2>Location</h2>
         (not implemented yet)
-        <h2>Description<\h2>
+        <h2>Description</h2>
         {session.data.session_description}
-        <h2>Speakers<\h2>
+        <h2>Speakers</h2>
         {speakers}
         """
     ).format(**locals())
