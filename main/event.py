@@ -120,13 +120,13 @@ class Database:
         for session in self.sessions.values():
             if session.updated:
                 path = data_dir / "sessions" / session.filename
-                path.write_text(session.data.json())
+                path.write_text(session.data.json(by_alias=True))
                 logger.info("Wrote %s", path)
         (data_dir / "speakers").mkdir(exist_ok=True)
         for speaker in self.speakers.values():
             if speaker.updated:
                 path = data_dir / "speakers" / speaker.filename
-                path.write_text(speaker.data.json())
+                path.write_text(speaker.data.json(by_alias=True))
                 logger.info("Wrote %s", path)
 
     def delete_session(self, stub: str) -> bool:
