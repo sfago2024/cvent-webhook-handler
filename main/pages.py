@@ -28,9 +28,9 @@ def render_page(title: str, content: str):
               </div>
             </header>
             <nav>
-              <a href="/schedule/">Schedule</a>
-              <a href="/sessions/">Sessions</a>
-              <a href="/speakers/">Speakers</a>
+              <a href="/schedule.html">Schedule</a>
+              <a href="/sessions.html">Sessions</a>
+              <a href="/speakers.html">Speakers</a>
             </nav>
             <div class="content">
 
@@ -102,21 +102,16 @@ def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> No
     (output_dir).mkdir(exist_ok=True)
     shutil.copytree(static_dir, output_dir, dirs_exist_ok=True)
 
-    (output_dir / "schedule").mkdir()
-    (output_dir / "schedule/index.html").write_text(
+    (output_dir / "schedule.html").write_text(
         render_page("Schedule", "(not implemented yet)")
     )
 
     (output_dir / "sessions").mkdir()
     for session in database.sessions.values():
         page = session_page(session, database)
-        path = Path(session.url).relative_to("/")
-        path.mkdir()
-        (path / "index.html").write_text(page)
+        path = Path(session.url).relative_to("/").write_text(page)
 
     (output_dir / "speakers").mkdir()
     for speaker in database.speakers.values():
         page = speaker_page(speaker, database)
-        path = Path(speaker.url).relative_to("/")
-        path.mkdir()
-        (path / "index.html").write_text(page)
+        path = Path(speaker.url).relative_to("/").write_text(page)

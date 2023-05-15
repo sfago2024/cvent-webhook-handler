@@ -62,7 +62,7 @@ class Session:
 
     @property
     def url(self) -> str:
-        return f"/sessions/{slugify(self.data.session_name)}"
+        return f"/sessions/{slugify(self.data.session_name)}.html"
 
     @property
     def link(self) -> str:
@@ -85,7 +85,7 @@ class Speaker:
 
     @property
     def url(self) -> str:
-        return f"/speakers/{slugify(self.data.speaker_display_name)}"
+        return f"/speakers/{slugify(self.data.speaker_display_name)}.html"
 
     @property
     def link(self) -> str:
