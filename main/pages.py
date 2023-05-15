@@ -106,7 +106,7 @@ def index_page(title: str, links: list[str]) -> str:
         {items}
         </ul>
         """
-    )
+    ).format(**locals())
     return render_page(title, content)
 
 
