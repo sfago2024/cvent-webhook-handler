@@ -46,33 +46,6 @@ class SpeakerData(BaseModel):
         allow_mutation = False
 
 
-def handle_event(event: dict, output_dir: Path, database: Database) -> bool:
-    event_type = event["eventType"]
-    message = event["message"]
-
-    if event_type == "SessionCreated":
-        session = SessionData(**message)
-        changed = database.update_session(session)
-    elif event_type == "SessionUpdated":
-        session = SessionData(**message)
-        changed = database.update_session(session)
-    elif event_type == "SessionDeleted":
-        session_stub = message["sessionStub"]
-        changed = database.delete_session(session_stub)
-    elif event_type == "SpeakerCreated":
-        speaker = SpeakerData(**message)
-        changed = database.update_speaker(speaker)
-    elif event_type == "SpeakerUpdated":
-        speaker = SpeakerData(**message)
-        changed = database.update_speaker(speaker)
-    elif event_type == "SpeakerDeleted":
-        speaker_stub = message["speakerStub"]
-        changed = database.delete_speaker(speaker_stub)
-    else:
-        raise ValueError(f"Unrecognized event type {event_type!r}")
-    return changed
-
-
 @dataclass
 class Session:
     data: SessionData
@@ -191,6 +164,33 @@ class Database:
             speaker = Speaker(data)
             self.speakers[speaker.stub] = speaker
             return True
+
+
+def handle_event(event: dict, output_dir: Path, database: Database) -> bool:
+    event_type = event["eventType"]
+    message = event["message"]
+
+    if event_type == "SessionCreated":
+        session = SessionData(**message)
+        changed = database.update_session(session)
+    elif event_type == "SessionUpdated":
+        session = SessionData(**message)
+        changed = database.update_session(session)
+    elif event_type == "SessionDeleted":
+        session_stub = message["sessionStub"]
+        changed = database.delete_session(session_stub)
+    elif event_type == "SpeakerCreated":
+        speaker = SpeakerData(**message)
+        changed = database.update_speaker(speaker)
+    elif event_type == "SpeakerUpdated":
+        speaker = SpeakerData(**message)
+        changed = database.update_speaker(speaker)
+    elif event_type == "SpeakerDeleted":
+        speaker_stub = message["speakerStub"]
+        changed = database.delete_speaker(speaker_stub)
+    else:
+        raise ValueError(f"Unrecognized event type {event_type!r}")
+    return changed
 
 
 def slugify(s: str) -> str:
