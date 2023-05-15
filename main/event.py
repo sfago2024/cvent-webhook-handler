@@ -66,7 +66,7 @@ class Session:
 
     @property
     def link(self) -> str:
-        return f'<a href="/sessions/{self.url}">{self.data.session_name}</a>'
+        return f'<a href="{self.url}">{self.data.session_name}</a>'
 
 
 @dataclass
@@ -89,7 +89,7 @@ class Speaker:
 
     @property
     def link(self) -> str:
-        return f'<a href="/speakers/{self.url}">{self.data.speaker_display_name}</a>'
+        return f'<a href="{self.url}">{self.data.speaker_display_name}</a>'
 
 
 @dataclass
