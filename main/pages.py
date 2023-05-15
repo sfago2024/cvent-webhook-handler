@@ -99,8 +99,8 @@ def session_page(session: Session, database: Database) -> str:
 
 def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> None:
     shutil.rmtree(output_dir)
-    (output_dir).mkdir()
-    shutil.copytree(static_dir, output_dir)
+    (output_dir).mkdir(exist_ok=True)
+    shutil.copytree(static_dir, output_dir, dirs_exist_ok=True)
 
     (output_dir / "schedule").mkdir()
     (output_dir / "schedule/index.html").write_text(
