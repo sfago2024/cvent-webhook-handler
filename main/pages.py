@@ -123,9 +123,9 @@ def schedule_page(title: str, database: Database) -> str:
 
     lines = []
     for date, times in sorted(days.items()):
-        lines.append(f"<h2>{date}</h2>")
+        lines.append(f"<h2>{date:%A, %B %d, %Y}</h2>")
         for time, links in sorted(times.items()):
-            lines.append(f"<h3>{time}</h3>")
+            lines.append(f"<h3>{time:%I%M %p}</h3>")
             lines.append(f"<ul>")
             for link in links:
                 lines.append(f"<li>{link}</li>")
