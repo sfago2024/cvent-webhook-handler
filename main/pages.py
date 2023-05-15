@@ -1,6 +1,6 @@
 import logging
 import shutil
-from datetime import datetime
+from datetime import date, datetime, time
 from pathlib import Path
 from textwrap import dedent
 
@@ -101,7 +101,7 @@ def session_page(session: Session, database: Database) -> str:
 
 
 def index_page(title: str, links: list[str]) -> str:
-    items = "\n".join(links)
+    items = "\n".join(f"<li>{link}</li>" for link in sorted(links))
     content = dedent(
         """
         <h1>{title}</h1>
@@ -113,14 +113,40 @@ def index_page(title: str, links: list[str]) -> str:
     return render_page(title, content)
 
 
+def schedule_page(title: str, database: Database) -> str:
+    days: dict[date, dict[time, list[str]]] = {}
+    for session in database.sessions.values():
+        start = session.data.session_start_date_time
+        times = days.setdefault(start.date(), {})
+        links = times.setdefault(start.time(), [])
+        links.append(session.link)
+
+    lines = []
+    for date, times in sorted(days.items()):
+        lines.append(f"<h2>{date}</h2>")
+        for time, links in sorted(times.items()):
+            lines.append(f"<h3>{time}</h3>")
+            lines.append(f"<ul>")
+            for link in links:
+                lines.append(f"<li>{link}</li>")
+            lines.append(f"</ul>")
+
+    joined_lines = "\n".join(lines)
+    content = dedent(
+        """
+        <h1>Schedule</h1>
+        {joined_lines}
+        """
+    ).format(**locals())
+    return render_page(title, content)
+
+
 def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> None:
     shutil.rmtree(output_dir)
     (output_dir).mkdir(exist_ok=True)
     shutil.copytree(static_dir, output_dir, dirs_exist_ok=True)
 
-    (output_dir / "schedule.html").write_text(
-        render_page("Schedule", "(not implemented yet)")
-    )
+    (output_dir / "schedule.html").write_text(schedule_page("Schedule", database))
 
     (output_dir / "sessions").mkdir()
     links = []
