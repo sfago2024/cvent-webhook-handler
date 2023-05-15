@@ -17,7 +17,7 @@ from .event import Database, handle_event
 from .pages import generate_pages
 
 
-def make_app(*, auth_token: str, data_dir: Path, output_dir: Path):
+def make_app(*, auth_token: str, data_dir: Path, static_dir: Path, output_dir: Path):
     app = FastAPI()
 
     @app.get("/")
@@ -65,7 +65,7 @@ def make_app(*, auth_token: str, data_dir: Path, output_dir: Path):
             logger.error("Failed to save database", exc_info=True)
             return
         try:
-            generate_pages(database, output_dir)
+            generate_pages(database, static_dir, output_dir)
         except Exception:
             logger.error("Failed to generate pages", exc_info=True)
             return
@@ -89,6 +89,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--data-dir", type=directory, required=True)
+    parser.add_argument("--static-dir", type=directory, required=True)
     parser.add_argument("--output-dir", type=directory, required=True)
     args = parser.parse_args()
 
@@ -96,9 +97,16 @@ if __name__ == "__main__":
         auth_token = os.environ["CVENT_AUTH_TOKEN"]
     except KeyError:
         raise RuntimeError(f"Missing environment variable CVENT_AUTH_TOKEN")
+
+    database = Database.load(args.data_dir)
+    generate_pages(database, static_dir=args.static_dir, output_dir=args.output_dir)
+
     uvicorn.run(
         make_app(
-            auth_token=auth_token, data_dir=args.data_dir, output_dir=args.output_dir
+            auth_token=auth_token,
+            data_dir=args.data_dir,
+            static_dir=args.static_dir,
+            output_dir=args.output_dir,
         ),
         port=args.port,
     )

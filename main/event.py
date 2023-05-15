@@ -16,15 +16,15 @@ def camel_case(name: str) -> str:
 
 
 class SessionData(BaseModel):
-    session_end_date_time: datetime
     session_description: str
+    session_end_date_time: datetime
     session_name: str
-    updated_date: date
-    session_stub: str
     session_start_date_time: datetime
+    session_stub: str
+    speaker_category: list[str]
     speakers: list[str]
     timezone_name: str
-    speaker_category: list[str]
+    updated_date: date
 
     class Config:
         alias_generator = camel_case
@@ -87,6 +87,14 @@ class Session:
     def stub(self) -> str:
         return self.data.session_stub
 
+    @property
+    def url(self) -> str:
+        return f"/sessions/{slugify(self.data.session_name)}"
+
+    @property
+    def link(self) -> str:
+        return f'<a href="/sessions/{self.url}">{self.data.session_name}</a>'
+
 
 @dataclass
 class Speaker:
@@ -102,6 +110,14 @@ class Speaker:
     def stub(self) -> str:
         return self.data.speaker_stub
 
+    @property
+    def url(self) -> str:
+        return f"/speakers/{slugify(self.data.speaker_display_name)}"
+
+    @property
+    def link(self) -> str:
+        return f'<a href="/speakers/{self.url}">{self.data.speaker_display_name}</a>'
+
 
 @dataclass
 class Database:
@@ -111,20 +127,29 @@ class Database:
     @classmethod
     def load(cls, data_dir: Path) -> Self:
         self = cls({}, {})
-        for path in (data_dir / "sessions").iterdir():
-            session = Session(SessionData.parse_file(path), updated=False)
-            self.sessions[session.stub] = session
-        for path in (data_dir / "speakers").iterdir():
-            speaker = Speaker(SpeakerData.parse_file(path), updated=False)
-            self.speakers[speaker.stub] = speaker
+        try:
+            for path in (data_dir / "sessions").iterdir():
+                session = Session(SessionData.parse_file(path), updated=False)
+                self.sessions[session.stub] = session
+        except FileNotFoundError:
+            pass
+        try:
+            for path in (data_dir / "speakers").iterdir():
+                speaker = Speaker(SpeakerData.parse_file(path), updated=False)
+                self.speakers[speaker.stub] = speaker
+        except FileNotFoundError:
+            pass
         return self
 
     def save(self, data_dir: Path) -> None:
+        data_dir.mkdir(exist_ok=True)
+        (data_dir / "sessions").mkdir(exist_ok=True)
         for session in self.sessions.values():
             if session.updated:
                 (data_dir / "sessions" / session.filename).write_text(
                     session.data.json()
                 )
+        (data_dir / "speakers").mkdir(exist_ok=True)
         for speaker in self.speakers.values():
             if speaker.updated:
                 (data_dir / "speakers" / speaker.filename).write_text(
@@ -166,3 +191,8 @@ class Database:
             speaker = Speaker(data)
             self.speakers[speaker.stub] = speaker
             return True
+
+
+def slugify(s: str) -> str:
+    # TODO: Make this better
+    return s.lower().replace(" ", "-")
