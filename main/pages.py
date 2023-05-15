@@ -125,19 +125,13 @@ def schedule_page(title: str, database: Database) -> str:
     for date, times in sorted(days.items()):
         lines.append(f"<h2>{date:%A, %B %d, %Y}</h2>")
         for time, links in sorted(times.items()):
-            lines.append(f"<h3>{time:%I%M %p}</h3>")
+            lines.append(f"<h3>{time:%I:%M %p}</h3>")
             lines.append(f"<ul>")
             for link in links:
                 lines.append(f"<li>{link}</li>")
             lines.append(f"</ul>")
 
-    joined_lines = "\n".join(lines)
-    content = dedent(
-        """
-        <h1>Schedule</h1>
-        {joined_lines}
-        """
-    ).format(**locals())
+    content = "\n".join(lines)
     return render_page(title, content)
 
 
