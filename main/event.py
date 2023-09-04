@@ -200,4 +200,4 @@ def handle_event(event: dict, output_dir: Path, database: Database) -> bool:
 
 def slugify(s: str) -> str:
     # TODO: Make this better
-    return s.lower().replace(" ", "-")
+    return s.lower().replace(" ", "-").replace("/", "-").replace(":", "-")
