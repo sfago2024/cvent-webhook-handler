@@ -32,7 +32,7 @@ class SessionData(BaseModel):
 
 
 class SpeakerData(BaseModel):
-    presenter_at: list[str]
+    presenter_at: list[str] = []
     speaker_biography: str
     speaker_display_name: str
     speaker_first_name: str
