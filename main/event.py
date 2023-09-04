@@ -21,8 +21,8 @@ class SessionData(BaseModel):
     session_name: str
     session_start_date_time: datetime
     session_stub: str
-    speaker_category: list[str]
-    speakers: list[str]
+    speaker_category: list[str] = []
+    speakers: list[str] = []
     timezone_name: str
     updated_date: date
 
