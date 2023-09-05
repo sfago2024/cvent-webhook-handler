@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -198,6 +199,8 @@ def handle_event(event: dict, output_dir: Path, database: Database) -> bool:
     return changed
 
 
+SLUG_REPLACE_PATTERN: re.Pattern[str] = re.compile(r"[^\w\d]+")
+
+
 def slugify(s: str) -> str:
-    # TODO: Make this better
-    return s.lower().replace(" ", "-").replace("/", "-").replace(":", "-")
+    return SLUG_REPLACE_PATTERN.sub("-", s.casefold())
