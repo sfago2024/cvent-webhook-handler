@@ -31,9 +31,9 @@ def render_page(title: str, content: str):
               </div>
             </header>
             <nav>
-              <a href="/schedule.html">Schedule</a>
-              <a href="/sessions.html">Sessions</a>
-              <a href="/speakers.html">Speakers</a>
+              <a href="/schedule/">Schedule</a>
+              <a href="/sessions/">Sessions</a>
+              <a href="/speakers/">Speakers</a>
             </nav>
             <div class="content">
 
@@ -140,22 +140,22 @@ def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> No
     (output_dir).mkdir(exist_ok=True)
     shutil.copytree(static_dir, output_dir, dirs_exist_ok=True)
 
-    (output_dir / "schedule.html").write_text(schedule_page("Schedule", database))
+    (output_dir / "schedule/index.html").write_text(schedule_page("Schedule", database))
 
     (output_dir / "sessions").mkdir()
     links = []
     for session in database.sessions.values():
         page = session_page(session, database)
-        path = Path(session.url).relative_to("/")
+        path = Path(session.url).relative_to("/") / "index.html"
         (output_dir / path).write_text(page)
         links.append(session.link)
-    (output_dir / "sessions.html").write_text(index_page("Sessions", links))
+    (output_dir / "sessions/index.html").write_text(index_page("Sessions", links))
 
     (output_dir / "speakers").mkdir()
     links = []
     for speaker in database.speakers.values():
         page = speaker_page(speaker, database)
-        path = Path(speaker.url).relative_to("/")
+        path = Path(speaker.url).relative_to("/") / "index.html"
         (output_dir / path).write_text(page)
         links.append(speaker.link)
-    (output_dir / "speakers.html").write_text(index_page("Speakers", links))
+    (output_dir / "speakers/index.html").write_text(index_page("Speakers", links))
