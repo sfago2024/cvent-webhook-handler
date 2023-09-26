@@ -203,4 +203,4 @@ SLUG_REPLACE_PATTERN: re.Pattern[str] = re.compile(r"[^\w\d]+")
 
 
 def slugify(s: str) -> str:
-    return SLUG_REPLACE_PATTERN.sub("-", s.casefold())
+    return SLUG_REPLACE_PATTERN.sub("-", s.casefold()).strip("-")
