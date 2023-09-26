@@ -140,6 +140,8 @@ def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> No
     (output_dir).mkdir(exist_ok=True)
     shutil.copytree(static_dir, output_dir, dirs_exist_ok=True)
 
+    (output_dir / "index.html").write_text(index_page("", []))
+
     (output_dir / "schedule").mkdir()
     (output_dir / "schedule/index.html").write_text(schedule_page("Schedule", database))
 
