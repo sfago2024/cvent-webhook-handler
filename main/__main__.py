@@ -67,7 +67,7 @@ def make_app(*, auth_token: str, data_dir: Path, static_dir: Path, output_dir: P
             logger.error("Failed to generate pages", exc_info=True)
             return
 
-    app.mount("/", StaticFiles(directory=output_dir), name="gen")
+    app.mount("/", StaticFiles(directory=output_dir, html=True), name="gen")
     return app
 
 
