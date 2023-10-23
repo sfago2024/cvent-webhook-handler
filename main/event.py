@@ -62,12 +62,15 @@ class Session:
         return self.data.session_stub
 
     @property
-    def url(self) -> str:
-        return f"/sessions/{slugify(self.data.session_name)}/"
+    def slugified_name(self) -> str:
+        return slugify(self.data.session_name)
 
     @property
-    def link(self) -> str:
-        return f'<a href="{self.url}">{self.data.session_name}</a>'
+    def url_relpath(self) -> str:
+        return f"sessions/{self.slugified_name}/"
+
+    def link(self, base_url: str) -> str:
+        return f'<a href="{base_url}{self.url_relpath}">{self.data.session_name}</a>'
 
 
 @dataclass
@@ -85,12 +88,15 @@ class Speaker:
         return self.data.speaker_stub
 
     @property
-    def url(self) -> str:
-        return f"/speakers/{slugify(self.data.speaker_display_name)}/"
+    def slugified_name(self) -> str:
+        return slugify(self.data.speaker_display_name)
 
     @property
-    def link(self) -> str:
-        return f'<a href="{self.url}">{self.data.speaker_display_name}</a>'
+    def url_relpath(self) -> str:
+        return f"speakers/{self.slugified_name}/"
+
+    def link(self, base_url: str) -> str:
+        return f'<a href="{base_url}{self.url_relpath}">{self.data.speaker_display_name}</a>'
 
 
 @dataclass
@@ -167,7 +173,7 @@ class Database:
             return True
 
 
-def handle_event(event: dict, output_dir: Path, database: Database) -> bool:
+def handle_event(event: dict, database: Database) -> bool:
     event_type = event["eventType"]
     message, *others = event["message"]
     if others:

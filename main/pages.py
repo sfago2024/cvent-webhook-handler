@@ -1,57 +1,32 @@
 import logging
 import shutil
+from asyncio.subprocess import PIPE, create_subprocess_exec
+from contextlib import asynccontextmanager
 from datetime import date, datetime, time
 from pathlib import Path
 from textwrap import dedent
+from typing import AsyncIterator
 
 from .event import Database, Session, Speaker
 
 logger = logging.getLogger(__name__)
 
 
-def render_page(title: str, content: str):
+def render_page(path: str, title: str, content: str):
     date = datetime.now()
     return dedent(
         """\
-        <!DOCTYPE html>
-        <html lang="en-us">
-        <head>
-          <meta charset="utf-8">
-          <title>{title} — AGO 2024 San Francisco</title>
-          <meta name="viewport" content="width=device-width,initial-scale=1">
-          <link rel="stylesheet" href="/default.css">
-        </head>
-        <body>
-          <div class="main-flex">
-            <header>
-              <div>
-                <img src="/img/logo.png" alt="AGO 2024 San Francisco logo">
-                <div class="line"></div>
-                <p class="dates"><time datetime="2024-06-30">June 30</time> – <time datetime="2024-07-04">July 4, 2024</time></p>
-              </div>
-            </header>
-            <nav>
-              <a href="/schedule/">Schedule</a>
-              <a href="/sessions/">Sessions</a>
-              <a href="/speakers/">Speakers</a>
-            </nav>
-            <div class="content">
+        +++
+        title = '''{title}'''
+        path = '''{path}'''
+        +++
 
         {content}
-
-            </div>
-            <div class="spacer"></div>
-            <footer>
-              <p>This page was last updated on {date:%A, %B %d, %Y, at %I:%M %p}.</p>
-            </footer>
-          </div>
-        </body>
-        </html>
         """
     ).format(**locals())
 
 
-def speaker_page(speaker: Speaker, database: Database) -> str:
+def speaker_page(path: str, speaker: Speaker, database: Database) -> str:
     if stubs := speaker.data.presenter_at:
         sessions = "<ul>"
         for stub in stubs:
@@ -70,10 +45,12 @@ def speaker_page(speaker: Speaker, database: Database) -> str:
         {sessions}
         """
     ).format(**locals())
-    return render_page(title=f"{speaker.data.speaker_display_name}", content=content)
+    return render_page(
+        path=path, title=f"{speaker.data.speaker_display_name}", content=content
+    )
 
 
-def session_page(session: Session, database: Database) -> str:
+def session_page(path: str, session: Session, database: Database) -> str:
     if stubs := session.data.speakers:
         speakers = "<ul>"
         for stub in stubs:
@@ -97,10 +74,10 @@ def session_page(session: Session, database: Database) -> str:
         {speakers}
         """
     ).format(**locals())
-    return render_page(title=f"{session.data.session_name}", content=content)
+    return render_page(path=path, title=f"{session.data.session_name}", content=content)
 
 
-def index_page(title: str, links: list[str]) -> str:
+def index_page(path: str, title: str, links: list[str]) -> str:
     items = "\n".join(f"<li>{link}</li>" for link in sorted(links))
     content = dedent(
         """
@@ -110,16 +87,16 @@ def index_page(title: str, links: list[str]) -> str:
         </ul>
         """
     ).format(**locals())
-    return render_page(title, content)
+    return render_page(path, title, content)
 
 
-def schedule_page(title: str, database: Database) -> str:
+def schedule_page(path: str, title: str, base_path: str, database: Database) -> str:
     days: dict[date, dict[time, list[str]]] = {}
     for session in database.sessions.values():
         start = session.data.session_start_date_time
         times = days.setdefault(start.date(), {})
         links = times.setdefault(start.time(), [])
-        links.append(session.link)
+        links.append(session.link(base_path))
 
     lines = []
     for date, times in sorted(days.items()):
@@ -132,41 +109,69 @@ def schedule_page(title: str, database: Database) -> str:
             lines.append(f"</ul>")
 
     content = "\n".join(lines)
-    return render_page(title, content)
+    return render_page(path, title, content)
 
 
-def generate_pages(database: Database, static_dir: Path, output_dir: Path) -> None:
-    shutil.rmtree(output_dir)
-    (output_dir).mkdir(exist_ok=True)
-    shutil.copytree(static_dir, output_dir, dirs_exist_ok=True)
+@asynccontextmanager
+async def clean_repo_state(repo_dir: Path) -> AsyncIterator[None]:
+    proc = await create_subprocess_exec(
+        "git", "status", "--porcelain", cwd=repo_dir, stdout=PIPE
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"'git status' exited {proc.returncode}")
+    if stdout:
+        items = stdout.decode("utf-8", errors="replace").splitlines()
+        raise RuntimeError(f"repo is not clean ({items})")
+    try:
+        yield
+    finally:
+        proc = await create_subprocess_exec(
+            "git", "status", "--porcelain", cwd=repo_dir, stdout=PIPE
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"'git status' exited {proc.returncode}")
+        if stdout:
+            logger.warn("Repo is dirty, cleaning it...")
+            proc = await create_subprocess_exec("git", "stash", "-u", cwd=repo_dir)
+            if (returncode := await proc.wait()) != 0:
+                raise RuntimeError(f"'git stash' exited {returncode}")
+            proc = await create_subprocess_exec("git", "stash", "drop", cwd=repo_dir)
+            await proc.wait()
 
-    (output_dir / "index.html").write_text(index_page("", []))
 
-    (output_dir / "schedule").mkdir()
-    (output_dir / "schedule/index.html").write_text(schedule_page("Schedule", database))
+async def generate_pages(database: Database, base_url: str, repo_dir: Path) -> None:
+    async with clean_repo_state(repo_dir):
+        output_dir = repo_dir / "content/_generated"
+        shutil.rmtree(output_dir)
+        output_dir.mkdir()
 
-    (output_dir / "sessions").mkdir()
-    links = []
-    for session in database.sessions.values():
-        page = session_page(session, database)
-        path = Path(session.url).relative_to("/")
-        try:
-            (output_dir / path).mkdir()
-        except FileExistsError:
-            logger.warn("Overwriting duplicate session %s", path)
-        (output_dir / path / "index.html").write_text(page)
-        links.append(session.link)
-    (output_dir / "sessions/index.html").write_text(index_page("Sessions", links))
+        (output_dir / "schedule.md").write_text(
+            schedule_page(base_url + "/schedule", "Schedule", base_url, database)
+        )
 
-    (output_dir / "speakers").mkdir()
-    links = []
-    for speaker in database.speakers.values():
-        page = speaker_page(speaker, database)
-        path = Path(speaker.url).relative_to("/")
-        try:
-            (output_dir / path).mkdir()
-        except FileExistsError:
-            logger.warn("Overwriting duplicate speaker %s", path)
-        (output_dir / path / "index.html").write_text(page)
-        links.append(speaker.link)
-    (output_dir / "speakers/index.html").write_text(index_page("Speakers", links))
+        links = []
+        for session in database.sessions.values():
+            page = session_page(base_url + session.url_relpath, session, database)
+            path = output_dir / f"session-{session.slugified_name}.md"
+            if path.exists():
+                logger.warn("Overwriting duplicate session %s", session.slugified_name)
+            path.write_text(page)
+            links.append(session.link(base_url))
+        (output_dir / "sessions.md").write_text(
+            index_page("sessions", "Sessions", links)
+        )
+
+        links = []
+        for speaker in database.speakers.values():
+            # TODO: Filter to performers only
+            page = speaker_page(base_url + speaker.url_relpath, speaker, database)
+            path = output_dir / f"speaker-{speaker.slugified_name}"
+            if path.exists():
+                logger.warn("Overwriting duplicate speaker %s", speaker.slugified_name)
+            path.write_text(page)
+            links.append(speaker.link(base_url))
+        (output_dir / "speakers.md").write_text(
+            index_page("performers", "Performers", links)
+        )

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -18,7 +19,7 @@ from .event import Database, handle_event
 from .pages import generate_pages
 
 
-def make_app(*, auth_token: str, data_dir: Path, static_dir: Path, output_dir: Path):
+def make_app(*, auth_token: str, data_dir: Path, base_url: str, repo_dir: Path):
     app = FastAPI()
 
     @app.get("/cvent-event")
@@ -45,7 +46,7 @@ def make_app(*, auth_token: str, data_dir: Path, static_dir: Path, output_dir: P
             )
         database = Database.load(data_dir)
         try:
-            changed = handle_event(event, output_dir, database)
+            changed = handle_event(event, database)
         except Exception as e:
             logger.warning("Failed to process request", exc_info=True)
             for line in json.dumps(event, indent=4).splitlines():
@@ -62,12 +63,11 @@ def make_app(*, auth_token: str, data_dir: Path, static_dir: Path, output_dir: P
             logger.error("Failed to save database", exc_info=True)
             return
         try:
-            generate_pages(database, static_dir, output_dir)
+            await generate_pages(database, base_url, repo_dir)
         except Exception:
             logger.error("Failed to generate pages", exc_info=True)
             return
 
-    app.mount("/", StaticFiles(directory=output_dir, html=True), name="gen")
     return app
 
 
@@ -87,8 +87,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--data-dir", type=directory, required=True)
-    parser.add_argument("--static-dir", type=directory, required=True)
-    parser.add_argument("--output-dir", type=directory, required=True)
+    parser.add_argument("--base-url-path", required=True)
+    parser.add_argument("--destination-repo-dir", type=directory, required=True)
     args = parser.parse_args()
 
     try:
@@ -97,14 +97,20 @@ if __name__ == "__main__":
         raise RuntimeError(f"Missing environment variable CVENT_AUTH_TOKEN")
 
     database = Database.load(args.data_dir)
-    generate_pages(database, static_dir=args.static_dir, output_dir=args.output_dir)
+    asyncio.run(
+        generate_pages(
+            database,
+            base_url=args.base_url_path,
+            repo_dir=args.destination_repo_dir,
+        )
+    )
 
     uvicorn.run(
         make_app(
             auth_token=auth_token,
             data_dir=args.data_dir,
-            static_dir=args.static_dir,
-            output_dir=args.output_dir,
+            base_url=args.base_url_path,
+            repo_dir=args.destination_repo_dir,
         ),
         port=args.port,
     )
