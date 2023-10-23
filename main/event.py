@@ -3,6 +3,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
+from enum import Enum, auto
 from pathlib import Path
 from typing import Self
 
@@ -47,6 +48,14 @@ class SpeakerData(BaseModel):
         frozen = True
 
 
+class SpeakerCategory(Enum):
+    PERFORMER = auto()
+    PRESENTER = auto()
+
+    def __repr__(self) -> str:
+        return self.name
+
+
 @dataclass
 class Session:
     data: SessionData
@@ -76,6 +85,7 @@ class Session:
 @dataclass
 class Speaker:
     data: SpeakerData
+    categories: list[SpeakerCategory]
     updated: bool = True
     deleted: bool = False
 
@@ -93,7 +103,11 @@ class Speaker:
 
     @property
     def url_relpath(self) -> str:
-        return f"speakers/{self.slugified_name}/"
+        logger.info("Categories: %s", self.categories)
+        if SpeakerCategory.PERFORMER in self.categories:
+            return f"performers/{self.slugified_name}/"
+        else:
+            return f"speakers/{self.slugified_name}/"
 
     def link(self, base_url: str) -> str:
         return f'<a href="{base_url}{self.url_relpath}">{self.data.speaker_display_name}</a>'
@@ -103,22 +117,62 @@ class Speaker:
 class Database:
     sessions: dict[str, Session]
     speakers: dict[str, Speaker]
+    speaker_categories: dict[str, list[SpeakerCategory]]
 
     @classmethod
     def load(cls, data_dir: Path) -> Self:
-        self = cls({}, {})
+        self = cls({}, {}, {})
         try:
             for path in (data_dir / "sessions").iterdir():
                 session = Session(SessionData.parse_file(path), updated=False)
+                if session.stub in self.sessions:
+                    logger.warn(
+                        "Duplicate session stub: %s (%s)",
+                        session.stub,
+                        session.slugified_name,
+                    )
                 self.sessions[session.stub] = session
+
+                for speaker_stub, category in zip(
+                    session.data.speakers, session.data.speaker_category
+                ):
+                    if category in {"Organist", "Performer"}:
+                        self.speaker_categories.setdefault(speaker_stub, []).append(
+                            SpeakerCategory.PERFORMER
+                        )
+                    elif category in {
+                        "Speaker",
+                        "Panelist",
+                        "Presenter",
+                        "Workshop Presenter",
+                        "Moderator",
+                        "New Music Composer",
+                    }:
+                        self.speaker_categories.setdefault(speaker_stub, []).append(
+                            SpeakerCategory.PRESENTER
+                        )
+                    else:
+                        logger.warning(
+                            "Unknown speaker category %s in %s",
+                            category,
+                            session.slugified_name,
+                        )
         except FileNotFoundError:
-            pass
+            logger.warn("FileNotFound while loading sessions", exc_info=True)
         try:
             for path in (data_dir / "speakers").iterdir():
-                speaker = Speaker(SpeakerData.parse_file(path), updated=False)
+                data = SpeakerData.parse_file(path)
+                categories = self.speaker_categories.get(data.speaker_stub, [])
+                speaker = Speaker(data, categories, updated=False)
+                if speaker.stub in self.speakers:
+                    logger.warn(
+                        "Duplicate speaker stub: %s (%s)",
+                        speaker.stub,
+                        speaker.slugified_name,
+                    )
                 self.speakers[speaker.stub] = speaker
         except FileNotFoundError:
-            pass
+            logger.warn("FileNotFound while loading speakers", exc_info=True)
         return self
 
     def save(self, data_dir: Path) -> None:
@@ -154,6 +208,7 @@ class Database:
                 return False
             else:
                 existing.data = data
+                existing.updated = True
                 return True
         else:
             session = Session(data)
@@ -166,9 +221,11 @@ class Database:
                 return False
             else:
                 existing.data = data
+                existing.updated = True
                 return True
         else:
-            speaker = Speaker(data)
+            categories = self.speaker_categories.get(data.speaker_stub, [])
+            speaker = Speaker(data, categories)
             self.speakers[speaker.stub] = speaker
             return True
 

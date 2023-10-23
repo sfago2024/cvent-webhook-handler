@@ -7,7 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import AsyncIterator
 
-from .event import Database, Session, Speaker
+from .event import Database, Session, Speaker, SpeakerCategory
 
 logger = logging.getLogger(__name__)
 
@@ -22,17 +22,23 @@ def render_page(path: str, title: str, content: str):
         template = "future.html"
         +++
 
+        <p class="todo">
+        <strong>NOTE:</strong> This page is automatically generated based on data from Cvent.
+        But, I'm aware of several issues with the generated pages at the moment:
+        many dates & times are wrong, and some sessions & speakers are missing altogether!
+        </p>
+
         {content}
         """
     ).format(**locals())
 
 
-def speaker_page(path: str, speaker: Speaker, database: Database) -> str:
+def speaker_page(path: str, speaker: Speaker, base_url: str, database: Database) -> str:
     if stubs := speaker.data.presenter_at:
         sessions = "<ul>"
         for stub in stubs:
             if session := database.sessions.get(stub):
-                sessions += f"<li>{session.link}</li>"
+                sessions += f"<li>{session.link(base_url)}</li>"
             else:
                 sessions += f"<li>(unknown session with identifier {stub})</li>"
     else:
@@ -51,12 +57,12 @@ def speaker_page(path: str, speaker: Speaker, database: Database) -> str:
     )
 
 
-def session_page(path: str, session: Session, database: Database) -> str:
+def session_page(path: str, session: Session, base_url: str, database: Database) -> str:
     if stubs := session.data.speakers:
         speakers = "<ul>"
         for stub in stubs:
             if speaker := database.speakers.get(stub):
-                speakers += f"<li>{speaker.link}</li>"
+                speakers += f"<li>{speaker.link(base_url)}</li>"
             else:
                 speakers += f"<li>(unknown speaker with identifier {stub})</li>"
     else:
@@ -91,13 +97,13 @@ def index_page(path: str, title: str, links: list[str]) -> str:
     return render_page(path, title, content)
 
 
-def schedule_page(path: str, title: str, base_path: str, database: Database) -> str:
+def schedule_page(path: str, title: str, base_url: str, database: Database) -> str:
     days: dict[date, dict[time, list[str]]] = {}
     for session in database.sessions.values():
         start = session.data.session_start_date_time
         times = days.setdefault(start.date(), {})
         links = times.setdefault(start.time(), [])
-        links.append(session.link(base_path))
+        links.append(session.link(base_url))
 
     lines = []
     for date, times in sorted(days.items()):
@@ -123,7 +129,10 @@ async def manage_repo(repo_dir: Path, commit: bool) -> AsyncIterator[None]:
         raise RuntimeError(f"'git status' exited {proc.returncode}")
     if stdout:
         items = stdout.decode("utf-8", errors="replace").splitlines()
-        raise RuntimeError(f"repo is not clean ({items})")
+        if commit:
+            raise RuntimeError(f"repo is not clean ({items})")
+        else:
+            logger.warning("repo is not clean (%s)", items)
     try:
         yield
     except:
@@ -147,17 +156,18 @@ async def manage_repo(repo_dir: Path, commit: bool) -> AsyncIterator[None]:
         raise
     else:
         # If we're in commit mode, build and make a commit!
-        proc = await create_subprocess_exec("zola", "build", cwd=repo_dir)
-        if (returncode := await proc.wait()) != 0:
-            raise RuntimeError(f"'zola build' exited {returncode}")
-        proc = await create_subprocess_exec("git", "add", ".", cwd=repo_dir)
-        if (returncode := await proc.wait()) != 0:
-            raise RuntimeError(f"'git add' exited {returncode}")
-        proc = await create_subprocess_exec(
-            "git", "commit", "-m", "cvent-webhook-handler update", cwd=repo_dir
-        )
-        if (returncode := await proc.wait()) != 0:
-            raise RuntimeError(f"'git commit' exited {returncode}")
+        if commit:
+            proc = await create_subprocess_exec("zola", "build", cwd=repo_dir)
+            if (returncode := await proc.wait()) != 0:
+                raise RuntimeError(f"'zola build' exited {returncode}")
+            proc = await create_subprocess_exec("git", "add", ".", cwd=repo_dir)
+            if (returncode := await proc.wait()) != 0:
+                raise RuntimeError(f"'git add' exited {returncode}")
+            proc = await create_subprocess_exec(
+                "git", "commit", "-m", "cvent-webhook-handler update", cwd=repo_dir
+            )
+            if (returncode := await proc.wait()) != 0:
+                raise RuntimeError(f"'git commit' exited {returncode}")
 
 
 async def generate_pages(
@@ -175,7 +185,9 @@ async def generate_pages(
 
         links = []
         for session in database.sessions.values():
-            page = session_page(base_url + session.url_relpath, session, database)
+            page = session_page(
+                base_url + session.url_relpath, session, base_url, database
+            )
             path = output_dir / f"session-{session.slugified_name}.md"
             if path.exists():
                 logger.warn("Overwriting duplicate session %s", session.slugified_name)
@@ -185,15 +197,20 @@ async def generate_pages(
             index_page(base_url + "sessions", "Sessions", links)
         )
 
-        links = []
+        performer_links = []
         for speaker in database.speakers.values():
             # TODO: Filter to performers only
-            page = speaker_page(base_url + speaker.url_relpath, speaker, database)
+            page = speaker_page(
+                base_url + speaker.url_relpath, speaker, base_url, database
+            )
             path = output_dir / f"speaker-{speaker.slugified_name}.md"
             if path.exists():
                 logger.warn("Overwriting duplicate speaker %s", speaker.slugified_name)
             path.write_text(page)
-            links.append(speaker.link(base_url))
+            if SpeakerCategory.PERFORMER in database.speaker_categories.get(
+                speaker.stub, []
+            ):
+                performer_links.append(speaker.link(base_url))
         (output_dir / "speakers.md").write_text(
-            index_page(base_url + "performers", "Performers", links)
+            index_page(base_url + "performers", "Performers", performer_links)
         )
