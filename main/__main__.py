@@ -64,11 +64,6 @@ def make_app(
         except Exception:
             logger.error("Failed to save database", exc_info=True)
             return
-        try:
-            await generate_pages(database, base_url, repo_dir, commit)
-        except Exception:
-            logger.error("Failed to generate pages", exc_info=True)
-            return
 
     return app
 

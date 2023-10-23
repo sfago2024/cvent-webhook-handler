@@ -103,7 +103,6 @@ class Speaker:
 
     @property
     def url_relpath(self) -> str:
-        logger.info("Categories: %s", self.categories)
         if SpeakerCategory.PERFORMER in self.categories:
             return f"performers/{self.slugified_name}/"
         else:

@@ -168,6 +168,9 @@ async def manage_repo(repo_dir: Path, commit: bool) -> AsyncIterator[None]:
             )
             if (returncode := await proc.wait()) != 0:
                 raise RuntimeError(f"'git commit' exited {returncode}")
+            proc = await create_subprocess_exec("git", "push", cwd=repo_dir)
+            if (returncode := await proc.wait()) != 0:
+                raise RuntimeError(f"'git push' exited {returncode}")
 
 
 async def generate_pages(
