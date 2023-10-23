@@ -19,7 +19,9 @@ from .event import Database, handle_event
 from .pages import generate_pages
 
 
-def make_app(*, auth_token: str, data_dir: Path, base_url: str, repo_dir: Path):
+def make_app(
+    *, auth_token: str, data_dir: Path, base_url: str, repo_dir: Path, commit: bool
+):
     app = FastAPI()
 
     @app.get("/cvent-event")
@@ -63,7 +65,7 @@ def make_app(*, auth_token: str, data_dir: Path, base_url: str, repo_dir: Path):
             logger.error("Failed to save database", exc_info=True)
             return
         try:
-            await generate_pages(database, base_url, repo_dir)
+            await generate_pages(database, base_url, repo_dir, commit)
         except Exception:
             logger.error("Failed to generate pages", exc_info=True)
             return
@@ -88,7 +90,8 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--data-dir", type=directory, required=True)
     parser.add_argument("--base-url-path", required=True)
-    parser.add_argument("--destination-repo-dir", type=directory, required=True)
+    parser.add_argument("--destination-repo", type=directory, required=True)
+    parser.add_argument("--commit", action="store_true")
     args = parser.parse_args()
 
     try:
@@ -101,7 +104,8 @@ if __name__ == "__main__":
         generate_pages(
             database,
             base_url=args.base_url_path,
-            repo_dir=args.destination_repo_dir,
+            repo_dir=args.destination_repo,
+            commit=args.commit,
         )
     )
 
@@ -110,7 +114,8 @@ if __name__ == "__main__":
             auth_token=auth_token,
             data_dir=args.data_dir,
             base_url=args.base_url_path,
-            repo_dir=args.destination_repo_dir,
+            repo_dir=args.destination_repo,
+            commit=args.commit,
         ),
         port=args.port,
     )

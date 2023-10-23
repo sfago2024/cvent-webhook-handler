@@ -113,7 +113,7 @@ def schedule_page(path: str, title: str, base_path: str, database: Database) -> 
 
 
 @asynccontextmanager
-async def clean_repo_state(repo_dir: Path) -> AsyncIterator[None]:
+async def manage_repo(repo_dir: Path, commit: bool) -> AsyncIterator[None]:
     proc = await create_subprocess_exec(
         "git", "status", "--porcelain", cwd=repo_dir, stdout=PIPE
     )
@@ -125,24 +125,45 @@ async def clean_repo_state(repo_dir: Path) -> AsyncIterator[None]:
         raise RuntimeError(f"repo is not clean ({items})")
     try:
         yield
-    finally:
+    except:
+        # If we're in commit mode, clean up any mess
+        if commit:
+            proc = await create_subprocess_exec(
+                "git", "status", "--porcelain", cwd=repo_dir, stdout=PIPE
+            )
+            stdout, _ = await proc.communicate()
+            if proc.returncode != 0:
+                raise RuntimeError(f"'git status' exited {proc.returncode}")
+            if stdout:
+                logger.warn("Repo is dirty, cleaning it...")
+                proc = await create_subprocess_exec("git", "stash", "-u", cwd=repo_dir)
+                if (returncode := await proc.wait()) != 0:
+                    raise RuntimeError(f"'git stash' exited {returncode}")
+                proc = await create_subprocess_exec(
+                    "git", "stash", "drop", cwd=repo_dir
+                )
+                await proc.wait()
+        raise
+    else:
+        # If we're in commit mode, make a commit!
         proc = await create_subprocess_exec(
-            "git", "status", "--porcelain", cwd=repo_dir, stdout=PIPE
+            "git",
+            "commit",
+            "-m",
+            "cvent-webhook-handler update",
+            ".",
+            cwd=repo_dir,
+            stdout=PIPE,
         )
         stdout, _ = await proc.communicate()
         if proc.returncode != 0:
-            raise RuntimeError(f"'git status' exited {proc.returncode}")
-        if stdout:
-            logger.warn("Repo is dirty, cleaning it...")
-            proc = await create_subprocess_exec("git", "stash", "-u", cwd=repo_dir)
-            if (returncode := await proc.wait()) != 0:
-                raise RuntimeError(f"'git stash' exited {returncode}")
-            proc = await create_subprocess_exec("git", "stash", "drop", cwd=repo_dir)
-            await proc.wait()
+            raise RuntimeError(f"'git commit' exited {proc.returncode}")
 
 
-async def generate_pages(database: Database, base_url: str, repo_dir: Path) -> None:
-    async with clean_repo_state(repo_dir):
+async def generate_pages(
+    database: Database, base_url: str, repo_dir: Path, commit: bool
+) -> None:
+    async with manage_repo(repo_dir, commit):
         output_dir = repo_dir / "content/_generated"
         shutil.rmtree(output_dir)
         output_dir.mkdir()
