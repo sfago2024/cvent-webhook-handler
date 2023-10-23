@@ -29,7 +29,7 @@ class SessionData(BaseModel):
 
     class Config:
         alias_generator = camel_case
-        allow_mutation = False
+        frozen = True
 
 
 class SpeakerData(BaseModel):
@@ -44,7 +44,7 @@ class SpeakerData(BaseModel):
 
     class Config:
         alias_generator = camel_case
-        allow_mutation = False
+        frozen = True
 
 
 @dataclass

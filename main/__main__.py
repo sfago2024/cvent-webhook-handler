@@ -87,7 +87,7 @@ if __name__ == "__main__":
     )
 
     parser = ArgumentParser()
-    parser.add_argument("--port", type=int, required=True)
+    parser.add_argument("--port", type=int)
     parser.add_argument("--data-dir", type=directory, required=True)
     parser.add_argument("--base-url-path", required=True)
     parser.add_argument("--destination-repo", type=directory, required=True)
@@ -109,13 +109,14 @@ if __name__ == "__main__":
         )
     )
 
-    uvicorn.run(
-        make_app(
-            auth_token=auth_token,
-            data_dir=args.data_dir,
-            base_url=args.base_url_path,
-            repo_dir=args.destination_repo,
-            commit=args.commit,
-        ),
-        port=args.port,
-    )
+    if args.port:
+        uvicorn.run(
+            make_app(
+                auth_token=auth_token,
+                data_dir=args.data_dir,
+                base_url=args.base_url_path,
+                repo_dir=args.destination_repo,
+                commit=args.commit,
+            ),
+            port=args.port,
+        )

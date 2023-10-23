@@ -19,6 +19,7 @@ def render_page(path: str, title: str, content: str):
         +++
         title = '''{title}'''
         path = '''{path}'''
+        template = "future.html"
         +++
 
         {content}
@@ -145,19 +146,18 @@ async def manage_repo(repo_dir: Path, commit: bool) -> AsyncIterator[None]:
                 await proc.wait()
         raise
     else:
-        # If we're in commit mode, make a commit!
+        # If we're in commit mode, build and make a commit!
+        proc = await create_subprocess_exec("zola", "build", cwd=repo_dir)
+        if (returncode := await proc.wait()) != 0:
+            raise RuntimeError(f"'zola build' exited {returncode}")
+        proc = await create_subprocess_exec("git", "add", ".", cwd=repo_dir)
+        if (returncode := await proc.wait()) != 0:
+            raise RuntimeError(f"'git add' exited {returncode}")
         proc = await create_subprocess_exec(
-            "git",
-            "commit",
-            "-m",
-            "cvent-webhook-handler update",
-            ".",
-            cwd=repo_dir,
-            stdout=PIPE,
+            "git", "commit", "-m", "cvent-webhook-handler update", cwd=repo_dir
         )
-        stdout, _ = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(f"'git commit' exited {proc.returncode}")
+        if (returncode := await proc.wait()) != 0:
+            raise RuntimeError(f"'git commit' exited {returncode}")
 
 
 async def generate_pages(
@@ -165,11 +165,12 @@ async def generate_pages(
 ) -> None:
     async with manage_repo(repo_dir, commit):
         output_dir = repo_dir / "content/_generated"
-        shutil.rmtree(output_dir)
+        if output_dir.is_dir():
+            shutil.rmtree(output_dir)
         output_dir.mkdir()
 
         (output_dir / "schedule.md").write_text(
-            schedule_page(base_url + "/schedule", "Schedule", base_url, database)
+            schedule_page(base_url + "schedule", "Schedule", base_url, database)
         )
 
         links = []
@@ -181,18 +182,18 @@ async def generate_pages(
             path.write_text(page)
             links.append(session.link(base_url))
         (output_dir / "sessions.md").write_text(
-            index_page("sessions", "Sessions", links)
+            index_page(base_url + "sessions", "Sessions", links)
         )
 
         links = []
         for speaker in database.speakers.values():
             # TODO: Filter to performers only
             page = speaker_page(base_url + speaker.url_relpath, speaker, database)
-            path = output_dir / f"speaker-{speaker.slugified_name}"
+            path = output_dir / f"speaker-{speaker.slugified_name}.md"
             if path.exists():
                 logger.warn("Overwriting duplicate speaker %s", speaker.slugified_name)
             path.write_text(page)
             links.append(speaker.link(base_url))
         (output_dir / "speakers.md").write_text(
-            index_page("performers", "Performers", links)
+            index_page(base_url + "performers", "Performers", links)
         )
