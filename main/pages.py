@@ -63,7 +63,7 @@ def session_page(path: str, session: Session, base_url: str, database: Database)
         speaker_types = set()
         for stub in stubs:
             if speaker := database.speakers.get(stub):
-                speaker_types.update(database.speaker_categories.get(speaker.stub))
+                speaker_types.update(database.speaker_categories.get(speaker.stub, []))
                 speakers += f"<li>{speaker.link(base_url)}</li>"
             else:
                 speakers += f"<li>(unknown speaker with identifier {stub})</li>"
