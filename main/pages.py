@@ -60,27 +60,41 @@ def speaker_page(path: str, speaker: Speaker, base_url: str, database: Database)
 def session_page(path: str, session: Session, base_url: str, database: Database) -> str:
     if stubs := session.data.speakers:
         speakers = "<ul>"
+        speaker_types = set()
         for stub in stubs:
             if speaker := database.speakers.get(stub):
+                speaker_types.update(database.speaker_categories.get(speaker.stub))
                 speakers += f"<li>{speaker.link(base_url)}</li>"
             else:
                 speakers += f"<li>(unknown speaker with identifier {stub})</li>"
+        speakers += "</ul>"
+        match speaker_types:
+            case [SpeakerCategory.PERFORMER]:
+                speaker_label = "Performers"
+            case [SpeakerCategory.PRESENTER]:
+                speaker_label = "Presenters"
+            case _:
+                speaker_label = "People"
     else:
-        speakers = "<p>None yet</p>"
+        speaker_label = None
+        speakers = None
     content = dedent(
         """\
         <h1>{session.data.session_name}</h1>
         <h2>Date/Time</h2>
         <p>{session.data.session_start_date_time:%A, %B %d, %Y}<br>
         {session.data.session_start_date_time:%I:%M %p} – {session.data.session_end_date_time:%I:%M %p} ({session.data.timezone_name})</p>
-        <h2>Location</h2>
-        (not implemented yet)
         <h2>Description</h2>
         {session.data.session_description}
-        <h2>Speakers</h2>
-        {speakers}
         """
     ).format(**locals())
+    if speaker_label:
+        content += dedent(
+            """\
+            <h2>{speaker_label}</h2>
+            {speakers}
+            """
+        ).format(**locals())
     return render_page(path=path, title=f"{session.data.session_name}", content=content)
 
 
@@ -133,6 +147,10 @@ async def manage_repo(repo_dir: Path, commit: bool) -> AsyncIterator[None]:
             raise RuntimeError(f"repo is not clean ({items})")
         else:
             logger.warning("repo is not clean (%s)", items)
+    if commit:
+        proc = await create_subprocess_exec("git", "pull", "--ff-only", cwd=repo_dir)
+        if (returncode := await proc.wait()) != 0:
+            raise RuntimeError(f"'git pull' exited {returncode}")
     try:
         yield
     except:
@@ -164,7 +182,11 @@ async def manage_repo(repo_dir: Path, commit: bool) -> AsyncIterator[None]:
             if (returncode := await proc.wait()) != 0:
                 raise RuntimeError(f"'git add' exited {returncode}")
             proc = await create_subprocess_exec(
-                "git", "commit", "-m", "cvent-webhook-handler update", cwd=repo_dir
+                "git",
+                "commit",
+                "--author=cvent-webhook-handler <colin+cventwebhookhandler@lumeh.org>",
+                "--message=cvent-webhook-handler update",
+                cwd=repo_dir,
             )
             if (returncode := await proc.wait()) != 0:
                 raise RuntimeError(f"'git commit' exited {returncode}")
@@ -200,9 +222,9 @@ async def generate_pages(
             index_page(base_url + "sessions", "Sessions", links)
         )
 
+        composer_links = []
         performer_links = []
         for speaker in database.speakers.values():
-            # TODO: Filter to performers only
             page = speaker_page(
                 base_url + speaker.url_relpath, speaker, base_url, database
             )
@@ -210,10 +232,17 @@ async def generate_pages(
             if path.exists():
                 logger.warn("Overwriting duplicate speaker %s", speaker.slugified_name)
             path.write_text(page)
+            if SpeakerCategory.COMPOSER in database.speaker_categories.get(
+                speaker.stub, []
+            ):
+                composer_links.append(speaker.link(base_url))
             if SpeakerCategory.PERFORMER in database.speaker_categories.get(
                 speaker.stub, []
             ):
                 performer_links.append(speaker.link(base_url))
-        (output_dir / "speakers.md").write_text(
+        (output_dir / "composers.md").write_text(
+            index_page(base_url + "composers", "Composers", performer_links)
+        )
+        (output_dir / "performers.md").write_text(
             index_page(base_url + "performers", "Performers", performer_links)
         )

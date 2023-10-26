@@ -49,6 +49,7 @@ class SpeakerData(BaseModel):
 
 
 class SpeakerCategory(Enum):
+    COMPOSER = auto()
     PERFORMER = auto()
     PRESENTER = auto()
 
@@ -103,6 +104,8 @@ class Speaker:
 
     @property
     def url_relpath(self) -> str:
+        if SpeakerCategory.COMPOSER in self.categories:
+            return f"composers/{self.slugified_name}/"
         if SpeakerCategory.PERFORMER in self.categories:
             return f"performers/{self.slugified_name}/"
         else:
@@ -139,13 +142,16 @@ class Database:
                         self.speaker_categories.setdefault(speaker_stub, []).append(
                             SpeakerCategory.PERFORMER
                         )
+                    elif category in {"New Music Composer"}:
+                        self.speaker_categories.setdefault(speaker_stub, []).append(
+                            SpeakerCategory.COMPOSER
+                        )
                     elif category in {
                         "Speaker",
                         "Panelist",
                         "Presenter",
                         "Workshop Presenter",
                         "Moderator",
-                        "New Music Composer",
                     }:
                         self.speaker_categories.setdefault(speaker_stub, []).append(
                             SpeakerCategory.PRESENTER
