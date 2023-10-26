@@ -241,7 +241,7 @@ async def generate_pages(
             ):
                 performer_links.append(speaker.link(base_url))
         (output_dir / "composers.md").write_text(
-            index_page(base_url + "composers", "Composers", performer_links)
+            index_page(base_url + "composers", "Composers", composer_links)
         )
         (output_dir / "performers.md").write_text(
             index_page(base_url + "performers", "Performers", performer_links)
