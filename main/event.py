@@ -268,6 +268,13 @@ def handle_event(event: dict, database: Database, mailgun_api_key: str) -> bool:
     elif event_type == "InviteeOrGuestAccepted":
         if message["admissionItem"] == "Convention Registration – SF Select Circle":
             notify_about_circle_registration(message, mailgun_api_key)
+        else:
+            logger.warning(
+                "Invitee/Guest accepted with admission item %r",
+                message["admissionItem"],
+            )
+            for line in json.dumps(message, indent=4).splitlines():
+                logger.debug("full message: %s", line)
     else:
         raise ValueError(f"Unrecognized event type {event_type!r}")
     return changed
