@@ -6,12 +6,14 @@ name = "pypi"
 [packages]
 fastapi = "*"
 uvicorn = {extras = ["standard"], version = "*"}
+requests = "*"
 
 [dev-packages]
 python-lsp-server = "*"
 pylsp-mypy = "*"
 pyls-isort = "*"
 python-lsp-black = "*"
+types-requests = "*"
 
 [requires]
 python_version = "3.11"

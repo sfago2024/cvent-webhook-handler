@@ -5,9 +5,12 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Self
+from textwrap import dedent
+from typing import Any, Self
 
+import requests
 from pydantic import BaseModel
+from requests.auth import HTTPBasicAuth
 
 logger = logging.getLogger(__name__)
 
@@ -235,7 +238,7 @@ class Database:
             return True
 
 
-def handle_event(event: dict, database: Database) -> bool:
+def handle_event(event: dict, database: Database, mailgun_api_key: str) -> bool:
     event_type = event["eventType"]
     message, *others = event["message"]
     if others:
@@ -262,9 +265,44 @@ def handle_event(event: dict, database: Database) -> bool:
     elif event_type == "SpeakerDeleted":
         speaker_stub = message["speakerStub"]
         changed = database.delete_speaker(speaker_stub)
+    elif event_type == "InviteeOrGuestAccepted":
+        if message["admissionItem"] == "Convention Registration – SF Select Circle":
+            notify_about_circle_registration(message, mailgun_api_key)
     else:
         raise ValueError(f"Unrecognized event type {event_type!r}")
     return changed
+
+
+def notify_about_circle_registration(
+    message: dict[str, Any], mailgun_api_key: str
+) -> None:
+    subject = f"SF Select Circle registration: {message.get('fullName')}"
+    body = dedent(
+        f"""
+        Full Name: {message.get("fullName")}
+        First Name: {message.get("firstName")}
+        Last Name: {message.get("lastName")}
+        Email: {message.get("email")}
+        Home Phone: {message.get("homePhone")}
+        Mobile Phone: {message.get("mobilePhone")}
+        Work Phone: {message.get("workPhone")}
+        """
+    )
+
+    data = {
+        "from": "sfago2024 Notifications <notifications@mg.sfago2024.org>",
+        # "to": "Brian Larsen <donate@sfago2024.org>",
+        # "cc": "Matthew Burt <matthewburt@gmail.com>",
+        # "cc": "Colin Chan <colin@sfago2024.org>",
+        "to": "Colin Chan <colin@sfago2024.org>",
+        "subject": subject,
+        "text": body,
+    }
+    requests.post(
+        "https://api.mailgun.net/v3/mg.sfago2024.org/messages",
+        data=data,
+        auth=HTTPBasicAuth("api", mailgun_api_key),
+    )
 
 
 SLUG_REPLACE_PATTERN: re.Pattern[str] = re.compile(r"[^\w\d]+")

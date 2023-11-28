@@ -16,12 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 from .event import Database, handle_event
-from .pages import generate_pages
 
 
-def make_app(
-    *, auth_token: str, data_dir: Path, base_url: str, repo_dir: Path, commit: bool
-):
+def make_app(*, auth_token: str, data_dir: Path, mailgun_api_key: str):
     app = FastAPI()
 
     @app.get("/cvent-event")
@@ -48,7 +45,7 @@ def make_app(
             )
         database = Database.load(data_dir)
         try:
-            changed = handle_event(event, database)
+            changed = handle_event(event, database, mailgun_api_key)
         except Exception as e:
             logger.warning("Failed to process request", exc_info=True)
             for line in json.dumps(event, indent=4).splitlines():
@@ -82,36 +79,24 @@ if __name__ == "__main__":
     )
 
     parser = ArgumentParser()
-    parser.add_argument("--port", type=int)
+    parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--data-dir", type=directory, required=True)
-    parser.add_argument("--base-url-path", required=True)
-    parser.add_argument("--destination-repo", type=directory, required=True)
-    parser.add_argument("--commit", action="store_true")
     args = parser.parse_args()
 
     try:
         auth_token = os.environ["CVENT_AUTH_TOKEN"]
     except KeyError:
         raise RuntimeError(f"Missing environment variable CVENT_AUTH_TOKEN")
+    try:
+        mailgun_api_key = os.environ["MAILGUN_API_KEY"]
+    except KeyError:
+        raise RuntimeError(f"Missing environment variable MAILGUN_API_KEY")
 
-    database = Database.load(args.data_dir)
-    asyncio.run(
-        generate_pages(
-            database,
-            base_url=args.base_url_path,
-            repo_dir=args.destination_repo,
-            commit=args.commit,
-        )
+    uvicorn.run(
+        make_app(
+            auth_token=auth_token,
+            data_dir=args.data_dir,
+            mailgun_api_key=mailgun_api_key,
+        ),
+        port=args.port,
     )
-
-    if args.port:
-        uvicorn.run(
-            make_app(
-                auth_token=auth_token,
-                data_dir=args.data_dir,
-                base_url=args.base_url_path,
-                repo_dir=args.destination_repo,
-                commit=args.commit,
-            ),
-            port=args.port,
-        )
