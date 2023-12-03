@@ -266,15 +266,17 @@ def handle_event(event: dict, database: Database, mailgun_api_key: str) -> bool:
         speaker_stub = message["speakerStub"]
         changed = database.delete_speaker(speaker_stub)
     elif event_type == "InviteeOrGuestAccepted":
-        if message["admissionItem"] == "Convention Registration – SF Select Circle":
+        # if "SF Select Circle" in message.get("admissionItem", ""):
+        if message.get("admissionItem") is not None:
             notify_about_circle_registration(message, mailgun_api_key)
         else:
             logger.warning(
                 "Invitee/Guest accepted with admission item %r",
-                message["admissionItem"],
+                message.get("admissionItem"),
             )
             for line in json.dumps(message, indent=4).splitlines():
                 logger.debug("full message: %s", line)
+        changed = False
     else:
         raise ValueError(f"Unrecognized event type {event_type!r}")
     return changed
@@ -283,9 +285,10 @@ def handle_event(event: dict, database: Database, mailgun_api_key: str) -> bool:
 def notify_about_circle_registration(
     message: dict[str, Any], mailgun_api_key: str
 ) -> None:
-    subject = f"SF Select Circle registration: {message.get('fullName')}"
+    subject = f"New convention registration for: {message.get('fullName')}"
     body = dedent(
         f"""
+        Admission Item: {message.get("admissionItem")}
         Full Name: {message.get("fullName")}
         First Name: {message.get("firstName")}
         Last Name: {message.get("lastName")}
