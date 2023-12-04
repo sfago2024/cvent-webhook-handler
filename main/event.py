@@ -266,8 +266,7 @@ def handle_event(event: dict, database: Database, mailgun_api_key: str) -> bool:
         speaker_stub = message["speakerStub"]
         changed = database.delete_speaker(speaker_stub)
     elif event_type == "InviteeOrGuestAccepted":
-        # if "SF Select Circle" in message.get("admissionItem", ""):
-        if message.get("admissionItem") is not None:
+        if "Select Circle" in message.get("admissionItem", ""):
             notify_about_circle_registration(message, mailgun_api_key)
         else:
             logger.warning(
@@ -301,10 +300,9 @@ def notify_about_circle_registration(
 
     data = {
         "from": "sfago2024 Notifications <notifications@mg.sfago2024.org>",
-        # "to": "Brian Larsen <donate@sfago2024.org>",
-        # "cc": "Matthew Burt <matthewburt@gmail.com>",
-        # "cc": "Colin Chan <colin@sfago2024.org>",
-        "to": "Colin Chan <colin@sfago2024.org>",
+        "to": "Brian Larsen <donate@sfago2024.org>",
+        "to": "Matthew Burt <matthewburt@gmail.com>",
+        "cc": "Colin Chan <colin@sfago2024.org>",
         "subject": subject,
         "text": body,
     }
