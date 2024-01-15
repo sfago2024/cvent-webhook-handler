@@ -301,16 +301,20 @@ def notify_about_circle_registration(
     data = {
         "from": "sfago2024 Notifications <notifications@mg.sfago2024.org>",
         "to": "Brian Larsen <donate@sfago2024.org>",
-        "to": "Matthew Burt <matthewburt@gmail.com>",
-        "cc": "Colin Chan <colin@sfago2024.org>",
+        "cc": "Colin Chan <colin@sfago2024.org>, Matthew Burt <matthewburt@gmail.com>",
         "subject": subject,
         "text": body,
     }
-    requests.post(
+    r = requests.post(
         "https://api.mailgun.net/v3/mg.sfago2024.org/messages",
         data=data,
         auth=HTTPBasicAuth("api", mailgun_api_key),
     )
+    try:
+        r.raise_for_status()
+    except Exception:
+        logger.error("Mailgun request failed", exc_info=True)
+        logger.warning("Failed request content: %s", r.text.rstrip())
 
 
 SLUG_REPLACE_PATTERN: re.Pattern[str] = re.compile(r"[^\w\d]+")
